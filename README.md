@@ -18,3 +18,7 @@ In Claude Code:
 ```
 /plugin marketplace update kata-kit
 ```
+
+## License
+
+[MIT](LICENSE)
