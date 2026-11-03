@@ -1,0 +1,14 @@
+{
+  "name": "kata-kit",
+  "description": "Marketplace for kata-kit, a reusable Claude Code toolkit for maintaining work and personal code.",
+  "owner": {
+    "name": "vitaliiverdiiev-dev"
+  },
+  "plugins": [
+    {
+      "name": "kata-kit",
+      "source": "./",
+      "description": "Personal toolkit of agents, skills and configs for maintaining code with Claude Code."
+    }
+  ]
+}
