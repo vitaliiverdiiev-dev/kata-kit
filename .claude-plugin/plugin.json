@@ -1,6 +1,6 @@
 {
   "name": "kata-kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Personal toolkit of agents, skills and configs for maintaining code with Claude Code.",
   "author": { "name": "vitaliiverdiiev-dev" },
   "repository": "https://github.com/vitaliiverdiiev-dev/kata-kit",
