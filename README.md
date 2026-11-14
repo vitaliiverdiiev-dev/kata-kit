@@ -15,20 +15,24 @@ In Claude Code:
 
 ## Skills
 
-Advisory engineering standards. Claude loads a skill's full text only when the task matches its description (automatic) or when you type its slash command (manual). Long reference files inside a skill load only when needed.
+Advisory engineering standards. Claude may load a skill's full text when the task matches its description (not guaranteed) or loads it when you type its slash command. Long reference files inside a skill load only when needed.
 
 | Skill | Covers | Loads automatically for |
 |---|---|---|
 | `/kata-kit:frontend-architecture` | `app/pages/domain/shared` layers, slices (`api/model/helpers/store/hooks/ui`), component boundaries, imports, test placement | React + TypeScript frontend changes |
 | `/kata-kit:backend-architecture` | `app/infrastructure/modules` modular monolith, DI and feature ownership, typed persistence, auth safety boundaries | NestJS backends only, not FastAPI, Hono etc. |
-| `/kata-kit:code-quality` | minimal complete diffs, comment discipline, strict TypeScript (sole owner, details in `references/typescript.md`), import/export ordering, `id`-first keys, JSX props, safe autofix | Implementing or reviewing TypeScript / React / NestJS code |
+| `/kata-kit:code-quality` | minimal complete diffs, canonical comment policy, strict TypeScript (sole owner, details in `references/typescript.md`), import/export ordering, `id`-first keys, JSX props, safe autofix | Implementing or reviewing TypeScript / React / NestJS code |
 | `/kata-kit:testing` | what is worth testing, TDD (red → green → refactor), regression tests, test doubles, coverage as a diagnostic | Building or changing behavior, fixing bugs |
 | `/kata-kit:quality-gate` | final evidence-based verification: types, lint, format, tests, build, runtime, security; PASS / FAIL / NOT RUN / BLOCKED and a READY / NOT READY decision | Explicit checkpoints: before a commit or PR, release, or "done" |
 | `/kata-kit:ui-design` | mobile-first UX, design-system tokens, accessibility (WCAG 2.2 AA), visual states, UI review checklist | New or significantly changed UI, UI/UX reviews |
 
 **testing vs quality-gate:** `testing` guides writing tests while you build. `quality-gate` runs once at a checkpoint to verify the finished change and report what actually passed. Neither one commits, pushes or installs anything. A READY report is not permission to commit.
 
-These are defaults. A project's own `CLAUDE.md`, documented exceptions and ESLint/TypeScript config take precedence and stay the enforced checks.
+**Comment policy:** `code-quality` owns the single comment policy (zero comments by default, five narrow prefixes). `quality-gate` verifies compliance at the checkpoint.
+
+**Skills are not guaranteed to load automatically.** For consequential work, invoke them explicitly: `code-quality` + `testing` (+ the architecture skill) before coding, `quality-gate` at the end. Confirm they actually loaded.
+
+These are defaults. A project's own ESLint/TypeScript config stays the enforced check. Its `CLAUDE.md` holds project context, commands and documented exceptions; it should not redefine these standards. A conflict between the two should be raised and decided, not silently ignored.
 
 ## Update
 

@@ -1,6 +1,6 @@
 ---
 name: quality-gate
-description: Run a scoped, evidence-based final verification at an explicit pre-commit, pre-PR, release, or implementation-completion checkpoint; check types, lint, format, tests, coverage, builds, relevant runtime behavior and security without committing.
+description: Run a scoped, evidence-based final verification at an explicit pre-commit, pre-PR, release, or implementation-completion checkpoint; check types, lint, format, tests, coverage, builds, comment-policy compliance, relevant runtime behavior and security without committing.
 ---
 # Quality Gate - Verify Before Commit
 
@@ -29,13 +29,15 @@ Capture `git status --short`, relevant working-tree/staged diffs, `git diff --ch
 6. **Runtime:** start and verify app/health/critical user flow when tools and environment permit. A successful test/build does not prove a running app works; use the runtime/browser workflow if available. Never claim runtime verification without observing it.
 7. **Data & deploy readiness:** migrations/schema compatibility, isolated test DB, startup/shutdown and data preservation when changed; do not run migrations against unknown or production-like databases.
 8. **Security:** inspect changed trust boundaries, permission enforcement, cookie/session/CSRF/CORS and validation as relevant; review dependency audit/lockfile changes and execute the repo's configured audit/scanner when available. Never claim a scan is complete when it was skipped or offline. No unreviewed supply-chain upgrades merely to obtain a green scan.
-9. **Diff hygiene:** check for secret-like files, leaked tokens, local config, unnecessary comments, incomplete TODOs, unused imports, generated artifacts, stale docs and tests changed only to hide a regression.
+9. **Diff hygiene:** check for secret-like files, leaked tokens, local config, incomplete TODOs, unused imports, generated artifacts, stale docs and tests changed only to hide a regression.
+10. **Comment policy:** the canonical policy lives in `code-quality`; load it and verify against it, don't restate it. For relevant source changes: run the repo's comment-policy lint/check if configured (must pass with zero errors and warnings); if none exists, review manually and report that enforcement isn't automated. Review **new and retained** comments in affected source for real value and prefix misuse. A passing marker regex is not proof of compliance. Report technical exceptions, generated-code exclusions and outstanding violations explicitly; no silent waivers. The gate reports violations; it does not rewrite comments.
 
 Use exact project commands (examples only when they exist: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:db`, `pnpm build`, `pnpm format:check`, `pnpm build-storybook`). Do not run mutating `--fix`, `install`, destructive database commands, or code rewriting automatically as part of a supposed *read-only* gate. If a check requires setup, request approval or report blocker.
 
 ## 3. Failures, retries, evidence
 
-- If a check fails, identify whether the failure is caused by this change or pre-existing. Report both; do not misclassify a baseline failure as green.
+- If a check fails, identify whether the failure is caused by this change or pre-existing. Report both; do not misclassify a baseline failure as green. Pre-existing lint/format failures are still failures: fix them in a separate pass (no unrelated destructive refactors without approval), then rerun the read-only gate.
+- A nonzero security audit is reported separately with the exact advisories; accepting the risk is an explicit user decision. Never relabel a failed command as PASS.
 - Run the appropriate tests/checks again after a fix, and repeat any final checks invalidated by new edits.
 - Distinguish `PASS`, `FAIL`, `NOT RUN`, and `BLOCKED` for each applicable check. A missing Docker/browser/network capability is **BLOCKED**, not PASS. Mark genuinely inapplicable checks `N/A` with a reason.
 - Never make up CI outcomes, coverage values, npm audit results or successful builds. A local scan and build cannot guarantee zero vulnerabilities or a safe future production deployment.
@@ -48,7 +50,7 @@ Report:
 - Commands actually executed and observed results (with failures/blockers).
 - Coverage assessment and meaningful untested risks, not just a percentage.
 - Security/dependency/runtime checks that did or did not run.
-- Diff hygiene and remaining risks.
+- Diff hygiene, comment-policy compliance (automated or manual, exceptions, violations) and remaining risks.
 - **Decision: READY / NOT READY**. READY only when all **applicable required** checks passed, with no blocking risk. If a required check is blocked, say NOT READY; the user may make an explicit exception decision but this skill must not silently approve it.
 
 A clean report is not permission to commit. Only a separate explicit user request authorizes Git mutations. Do not add a new agent, background watcher, automatic commit hook or CI pipeline as part of this skill.
