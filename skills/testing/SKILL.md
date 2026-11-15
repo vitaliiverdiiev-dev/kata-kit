@@ -34,7 +34,7 @@ TDD is a **working discipline**, not ritual. For mechanical moves, documentation
 - Avoid real network, production services, credentials, user data, nondeterministic sleeps and order-dependent fixtures. Reset state, timers and caches; isolate DB tests with a clearly nonproduction database.
 - Component tests: interact through the UI using accessible roles, names and user events. Check loading, success, errors, retry, keyboard/focus when relevant. Don't assert CSS class strings as the primary behavioral result.
 - API integration tests: verify status code, response contract, actual guard/authorization behavior, validation, persistence and error semantics. Test real DB behavior where the requirement depends on it.
-- Keep the established file placement convention: `frontend-architecture` owns React test placement; backend follows the target project's conventions.
+- Keep the established file placement convention: `frontend-architecture` owns React test placement; `backend-architecture` owns NestJS test placement. Preserve documented project exceptions and verify test discovery before moving tests.
 - Tests must fail when the intended regression is reintroduced. Spot-check this reasoning for important/high-risk cases.
 
 ## Coverage and regression policy

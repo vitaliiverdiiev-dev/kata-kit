@@ -57,8 +57,9 @@ For the **main page/domain component file** and app root component when applicab
 ## Test placement (deterministic)
 
 - Main page/domain component test always adjacent at slice root, regardless of directory name.
-- File named like its immediate parent folder (`button/button.tsx`) has its test adjacent.
-- Other test files go into **`tests/` in that file's immediate parent folder** (`api/tests/requests.test.ts`, `hooks/tests/use-status.test.ts`, `ui/tests/status-row.test.tsx`, `model/tests/schema.test.ts`). Never `__tests__/`, never internal `tests/index.ts`.
+- Otherwise compare the immediate parent folder name with the filename segment before its first dot. If they match, the test is adjacent (`button/button.tsx` -> `button/button.test.tsx`).
+- If not, the test goes into **`tests/` in that file's immediate parent folder** (`api/tests/requests.test.ts`, `hooks/tests/use-status.test.ts`, `ui/tests/status-row.test.tsx`, `model/tests/schema.test.ts`). Never `__tests__/`, never internal `tests/index.ts`.
+- Apply this to new tests; do not relocate existing tests solely to satisfy it.
 - `src/test/` is reserved for shared setup/utilities, not a second mirror of the app. Don't create empty test folders. Keep small tests targeted, including error/recovery scenarios.
 
 ## Enforcement and review

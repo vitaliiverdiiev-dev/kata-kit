@@ -1,43 +1,67 @@
 ---
 name: backend-architecture
-description: Apply the reusable KataKit Architecture standard to NestJS and TypeScript backend feature development, authentication modules, database infrastructure, module boundaries, testing, and architectural reviews.
+description: Apply KataKit's NestJS/TypeScript modular-monolith architecture when designing, implementing, reviewing, or refactoring backend modules, persistence, auth, module contracts, tests, and portable features.
 ---
-
 # Backend Architecture — NestJS Modular Monolith
 
-Use for NestJS/TypeScript backend work. First inspect the target repo's framework, `CLAUDE.md`, current module structure, migrations, configuration and tests. This skill defines a **default** for compatible projects; documented exceptions override the default. Do not force Nest conventions onto a FastAPI/Hono backend or rewrite an existing architecture unrequested.
+Use for NestJS/TypeScript backend work. First inspect the target repository's `CLAUDE.md`, actual framework/runtime, existing module conventions, DB configuration, migrations, tests, and documented exceptions. This is a **default for compatible projects**, not a command to restructure established code. Do not apply NestJS conventions to Hono/FastAPI services.
+
+## Non-negotiable principles
+
+- **Human-first:** a developer unfamiliar with KataKit should be able to identify ownership, dependencies, and the path of a request without learning a custom framework.
+- **Feature ownership:** organize application behavior around cohesive functional modules, not technical-type folders spanning the entire project.
+- **Small now, extensible later:** establish clear responsibilities but create only files and directories used by current behavior. Avoid mandatory repository interfaces, action classes, base services, event buses, or elaborate scaffolds.
+- **Portable when valuable:** keep reusable systems and suitable feature modules locally cohesive; keep domain-specific behavior out of reusable implementations. Do not require npm packaging, installers, or a KataKit runtime dependency.
+- **Nest-native:** prefer Nest modules, exported providers, DI, and established library APIs over custom frameworks.
 
 ## Top-level ownership
 
 ```text
 src/
-├── app/                   # app.module.ts, app.config.ts; composition and global Nest setup
-├── infrastructure/        # config, database, transport/storage adapters as actually required
-├── modules/               # independently owned functional Nest modules
-└── main.ts                # bootstrap, no business logic
+├── app/                # app.module.ts, app.config.ts; composition and app-wide setup
+├── infrastructure/     # env validation, DB connections, shared external clients
+├── modules/            # independently owned functional modules
+└── main.ts             # validated startup and bootstrap only
 ```
 
-- `app/`: Nest app composition and global framework configuration; registers feature modules and infrastructure. `app.config.ts` configures the **Nest application** (distinct from environment validation).
-- `infrastructure/`: env parsing/validation, persistence provider/pool, external system clients, lifecycle management. **No dependency on product feature internals.** Avoid generic repositories, base services, or invented adapters without consumers.
-- `modules/<feature>/`: own controllers, services/application logic, schemas, DTOs, guards, policies and tests **as needed**. Modules can start with two files. Do not scaffold all possible folders.
-- `main.ts`: validated startup and app bootstrap; no business behavior.
-- Repository `infra/` (Docker/Compose/CI/deployment artifacts) is separate from runtime backend `src/infrastructure/`.
+- `app/` composes modules/providers and global Nest behavior; it may depend on feature modules. `app.config.ts` configures the Nest application, distinct from environment validation.
+- `infrastructure/` owns shared technical facilities and **must not depend on product module internals**. Avoid an unnecessary connection pool per feature.
+- `modules/<feature>/` owns the feature's behavior, delivery adapters, persistence schemas, module-local integrations, and relevant tests.
+- Root `infra/` (Compose/deployment/CI) is distinct from runtime `src/infrastructure/`.
 
-## Module boundaries
+## Module design and public contracts
 
-- Nest application composition imports feature module entry classes. Other modules access a feature through **explicit exported providers / public contracts**, not deep-import its private controllers/helpers or reach across directly into its schema.
-- Use dependency injection; keep controllers primarily about HTTP parsing/response mapping/guards; move meaningful business actions to focused services when warranted. Never create a service merely for symmetry with another module.
-- Keep migrations and database schemas with actual owners; for Drizzle-based projects follow the project's `*.schema.ts` glob and reviewable SQL migration workflow. Never introduce an extra connection pool or run schema push automatically on startup unless specifically designed and approved.
-- Avoid circular Nest module dependencies and habitual `forwardRef()`. A module should have a coherent responsibility, not a name based on one technical file type.
-- Prefer explicit typed validation at runtime boundaries and never log passwords, tokens, connection strings or internal error stacks in public endpoints.
+- Assign each operation and persisted business fact one owning module. Keep modules cohesive and acyclic.
+- Use `http/`, `application/`, `domain/`, `persistence/`, `integrations/`, and `cli/` as **responsibility names, not mandatory folders**; add only those justified by actual code. A tiny module may have just its Nest module and a controller/provider.
+- Keep controllers/CLI thin; coordinate application operations outside transports; place pure business invariants in `domain` when a separate domain boundary earns its cost. Domain logic must not depend on Nest, Drizzle, HTTP, or a vendor SDK.
+- A feature's internals are private by default. Other modules import its Nest module and use explicitly exported providers/public contracts, not private controllers, helpers, or repositories. Use narrow public types and avoid re-exporting everything.
+- `index.ts` is optional for a consumer-facing source entrypoint; use direct file imports **inside** the module to avoid barrels and cycles.
+- Prefer direct provider calls for synchronous cross-module operations. Resolve cycles by reconsidering ownership/orchestration before using `forwardRef()`.
 
-## Authentication-specific architecture considerations
+Read [Module contracts](references/module-contracts.md) when creating modules, deciding layer placement, cross-module dependencies, ownership, or portable boundaries.
 
-When implementing authentication, **do not invent a custom crypto/session protocol**. Respect the actual selected auth library and its integration contract. Decide ownership explicitly: auth/session module, user/profile module only when distinct, persistence schema owner, auth guards, HTTP adapter, public endpoints, and frontend API contracts. Design for secure server-side enforcement (not only frontend route hiding), least privilege, safe cookie/session configuration, CSRF/CORS decisions, rate limiting of sensitive endpoints, safe password/session handling, and clearly documented self-hosted bootstrap/registration policy. Validate the current library/Nest/ORM version compatibility and official documentation before committing to an integration. Avoid security promises unsupported by tests. Never expose secrets through logging or API status endpoints.
+## Data ownership and cross-module reads
 
-## Tests and completion
+- A module owns writes and invariants for its data. Shared PostgreSQL and one database infrastructure are compatible with independent ownership.
+- Keep Drizzle schema definitions with their owner when the project supports it. Let the project's Drizzle configuration discover schemas; keep **one reviewed migration history** for one database. Never rewrite applied migrations or automatically `push` schemas on production startup.
+- Cross-module FKs are allowed when necessary for integrity; they do **not** authorize cross-module business writes. Coordinate shared schema references explicitly.
+- Read through public APIs by default. For multi-module views prefer batched read composition. Permit specialized **read-only** cross-module JOINs only when justified (e.g., filtering/sorting across all rows, aggregation, measured performance), isolated and DB-integration-tested. Never bypass authorization or business invariants through reporting queries.
 
-- Test public HTTP behavior, 4xx/5xx handling, guards, invalid inputs, authorization denials, session expiry/revocation, DB failure/cleanup, and actual persistence when applicable. Follow repo's existing backend test structure; no forced frontend folder conventions.
-- Distinguish unit/e2e/database tests; keep fast unit tests runnable without Docker if already supported. Use isolated test DBs and preserve local data by default.
-- Strict TypeScript: no `any`, unsafe/non-null assertions. Keep named exports and clear interfaces. Preserve ESM import specifiers and Nest decorator metadata as required by the configured compiler/runtime.
-- Verify lint, typecheck, tests, build, migrations and startup with **actual command results**; explain unrun checks. Do not alter CI, permissions or Git state without authorization.
+Read [Data ownership and transactions](references/data-and-transactions.md) for schema composition, read exceptions, transaction boundaries, concurrency, and Better Auth caveats.
+
+## Transaction policy
+
+- For one-module atomic work, use the project's native Drizzle transaction facility.
+- For genuinely atomic multi-module writes, one explicit coordinator owns **one shared transaction context**; participating persistence operations must use that context, not independent transactions. Choose and test a small concrete typed contract **when a real use case requires it**; do not scaffold `TransactionRunner`, Unit of Work, ALS/CLS, or outbox in advance.
+- Do not assume third-party auth/database hooks participate in an application transaction. Verify actual adapter and lifecycle semantics for the installed versions.
+- Protect concurrency invariants with DB constraints, atomic statements/locking where needed, and isolated database tests. Avoid external network calls inside DB transactions.
+
+## Tests, security, and completion
+
+- Unit-test placement for **new** tests: if the source filename's segment before its first dot equals the parent directory name, the test is adjacent (`auth/auth.service.ts` -> `auth/auth.service.spec.ts`); otherwise it goes in that directory's `tests/` (`auth/invitations.ts` -> `auth/tests/invitations.spec.ts`). Use the project's existing suffix and runner.
+- Keep module-owned integration tests under `modules/<feature>/tests/integrations/` where the runner supports it, using the project's naming; application-spanning e2e and shared harnesses may live at project-level `test/` or `tests/`. Do **not** relocate existing tests solely to satisfy this convention; any deliberate move must update runner globs, scripts and CI and confirm discovery.
+- `testing` owns test selection/TDD; `code-quality` owns general TypeScript and comment rules; `quality-gate` owns final verification. Do not duplicate their procedures here.
+- For auth, respect the selected proven library; do not invent password/session crypto. Check the installed library/Nest/ORM versions against official docs before committing to an integration. Enforce permissions on the server, validate at trust boundaries, review cookie/CSRF/CORS/rate-limit policies, document the self-hosted bootstrap/registration policy, and never expose credentials, secrets or internal error stacks.
+- Verify with actual project commands and report pass/fail/blocked; do not modify database state, CI, Git history, or ship without explicit authorization.
+
+Read [Tests and portability](references/tests-and-portability.md) when placing tests, moving reusable modules, or assessing extraction into another compatible application.
