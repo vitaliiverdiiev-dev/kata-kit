@@ -14,7 +14,7 @@ Examples:
 
 - Auth owns identities, credentials, sessions, invitation/registration lifecycle when delegated to the selected auth library.
 - Users may own a distinct profile and account-facing capabilities, **but must not duplicate** Better Auth-owned identity rows merely to have its own table.
-- Preferences owns general user preferences (theme, locale) only if the product genuinely has that capability. Product-domain settings belong to their domain module, e.g. in a learning app, Learning owns JLPT level, daily goal and progress; do not add these fields to a portable users/preferences module.
+- Preferences owns general user preferences (theme, locale) only if the product genuinely has that capability. Product-domain settings belong to their domain module, e.g. in a learning app, Learning owns learning level, daily goal and progress; do not add these fields to a portable users/preferences module.
 
 ## Optional internal areas
 
@@ -22,8 +22,8 @@ Examples:
 | --- | --- | --- |
 | `http/` | Nest controllers, transport DTOs/validation, response mapping | SQL and meaningful business decisions |
 | `application/` | Use-case coordination, permissions/policies at the proper boundary, transaction orchestration | HTTP specifics, ad-hoc external API clients and raw SQL scattered among operations |
-| `domain/` | Pure invariants, policies, domain models when complexity warrants | Nest/Drizzle/vendor imports, transport types |
-| `persistence/` | Drizzle tables, data access, repository implementations only when useful | HTTP response contracts, unrelated business workflows |
+| `domain/` | Pure invariants, policies, domain models when complexity warrants | Nest/ORM/vendor imports, transport types |
+| `persistence/` | ORM schema/tables, data access, repository implementations only when useful | HTTP response contracts, unrelated business workflows |
 | `integrations/` | Module-owned library/vendor adapters, hooks and vendor-specific config | Unrelated feature policy, duplicate framework implementations |
 | `cli/` | CLI parsing and presentation, calls into application behavior | Duplicated use-case logic |
 
@@ -59,7 +59,7 @@ If real business complexity develops, add `domain/`, targeted persistence helper
 - Across modules: consumer -> **explicit public provider/contract** of owner. Export the provider from the owner Nest module and import that module; don't re-register another module's provider locally.
 - Avoid direct imports of another module's `http/`, `persistence/`, `domain/` or implementation helpers. A narrowly exported value type is okay when it is part of a designed public contract.
 - Avoid cycles. Prefer moving orchestration into the owning feature or a separate real use-case module over habitual `forwardRef()`.
-- A public `index.ts` may help source consumers but is **optional**. Never use a module's own barrel for its internal Nest provider imports. Respect ESM specifiers and decorator metadata as configured.
+- Public contracts consumed by other modules go through the module's designated public entrypoint (`index.ts` or a dedicated contract file), as defined in the main skill; it lists only what consumers need. Never use a module's own entrypoint for its internal Nest provider imports. Respect ESM specifiers and decorator metadata as configured.
 
 ## Portable boundary (only for suitable functionality)
 

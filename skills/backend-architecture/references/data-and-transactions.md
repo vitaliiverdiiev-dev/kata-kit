@@ -1,15 +1,15 @@
 # Data ownership, read composition and transaction contracts
 
-Use for Drizzle schema changes, inter-module data access, multi-step writes, concurrency invariants, and auth lifecycle integration. These are default decisions for a NestJS + PostgreSQL + Drizzle modular monolith; inspect the installed versions and existing app conventions first.
+Use for schema changes, inter-module data access, multi-step writes, concurrency invariants, and auth lifecycle integration. These are default decisions for a NestJS modular monolith on a relational database, independent of the ORM; notes marked **Drizzle** apply only to projects using Drizzle. Inspect the installed versions and existing app conventions first.
 
 ## Data ownership
 
-- A functional module owns its business invariants, writes and the schema definitions of its data. Different modules may share one PostgreSQL database and one Drizzle connection/pool.
+- A functional module owns its business invariants, writes and the schema definitions of its data. Different modules may share one database and one connection/pool.
 - Owning a capability is not the same as owning duplicate rows: e.g., a Users module can expose profile-facing operations while Better Auth remains the source of truth for its identity fields.
 - Foreign keys between owner tables are allowed where DB integrity warrants them. A foreign key does not grant permission for consumer business writes.
-- Keep `*.schema.ts` with its owner when compatible with existing tooling. Discover schemas via Drizzle Kit's supported multi-file globs/paths or **composition in an app-level root**, rather than making shared `infrastructure/` import feature internals. A narrow schema-to-schema import for a real FK is an intentional compile-time exception, not a runtime permission to read/write other module data.
+- Keep schema definitions with their owner when compatible with existing tooling. Discover them via the ORM's supported multi-file configuration (**Drizzle:** Drizzle Kit globs/paths for `*.schema.ts`) or **composition in an app-level root**, rather than making shared `infrastructure/` import feature internals. A narrow schema-to-schema import for a real FK is an intentional compile-time exception, not a runtime permission to read/write other module data.
 - Prefer one reviewed, ordered migration history for one application database, even when schema definitions are module-local. Treat a new starter project as a fresh migration baseline only when appropriate; never rewrite already-applied history in a running installation.
-- Existing migrations, schema globs, Drizzle relation declarations, Better Auth adapter schemas and runtime query requirements must be checked before any move. `relations()` is not a substitute for actual DB FK constraints.
+- Existing migrations, schema globs, ORM relation declarations, Better Auth adapter schemas and runtime query requirements must be checked before any move. ORM-level relations (**Drizzle:** `relations()`) are not a substitute for actual DB FK constraints.
 
 ## Cross-module reads — decision order
 
@@ -23,7 +23,7 @@ Read-model exception does not permit cross-module writes, reliance on private re
 
 ### One module
 
-Use the existing ORM's native `db.transaction(...)` for a real multi-write atomic invariant. Keep transaction lifetime short. Honor the selected driver and its TypeScript types.
+Use the existing ORM's native transaction API (**Drizzle:** `db.transaction(...)`) for a real multi-write atomic invariant. Keep transaction lifetime short. Honor the selected driver and its TypeScript types.
 
 ### Multiple modules (only if **all** writes must be atomic)
 
@@ -35,13 +35,13 @@ Use the existing ORM's native `db.transaction(...)` for a real multi-write atomi
 
 ### Multi-module operations that do **not** need atomicity
 
-Avoid coupling registration to unrelated product features unnecessarily. Prefer defaults/lazy initialization where valid. After-commit callbacks, email, and external API requests cannot be rolled back with PostgreSQL; document partial-failure behavior. Use durable events/outbox only if a proven business requirement needs reliable asynchronous processing.
+Avoid coupling registration to unrelated product features unnecessarily. Prefer defaults/lazy initialization where valid. After-commit callbacks, email, and external API requests cannot be rolled back with the database transaction; document partial-failure behavior. Use durable events/outbox only if a proven business requirement needs reliable asynchronous processing.
 
 ### Security and concurrency
 
 - Enforce unique/foreign key/check constraints and atomic conditional updates where appropriate; default transaction isolation does not eliminate lost updates or all races.
 - Use row locks or stronger isolation only when necessary; test meaningful races (one-time invitations, reservations, uniqueness).
-- Never assume Better Auth hooks, adapters and application Drizzle transactions share one transaction. Check the **installed** Better Auth version, adapter behavior, and lifecycle ordering (including whether `after` hooks run before or after commit) in its source/docs before designing atomic invitation/registration flows. Never treat hook writes as part of an application transaction without evidence and a rollback test.
+- Never assume Better Auth hooks, adapters and application ORM transactions share one transaction. Check the **installed** Better Auth version, adapter behavior, and lifecycle ordering (including whether `after` hooks run before or after commit) in its source/docs before designing atomic invitation/registration flows. Never treat hook writes as part of an application transaction without evidence and a rollback test.
 - Never log credentials, session tokens, DB connection URLs or private errors when diagnosing transaction failures.
 
 ## Targeted architectural tests
@@ -54,7 +54,7 @@ Avoid coupling registration to unrelated product features unnecessarily. Prefer 
 ## Official reference material
 
 - NestJS modules: https://docs.nestjs.com/modules
-- Drizzle schema organization: https://orm.drizzle.team/docs/sql-schema-declaration
-- Drizzle Kit schema config: https://orm.drizzle.team/docs/drizzle-config-file
-- Drizzle transactions/savepoints: https://orm.drizzle.team/docs/transactions
+- Drizzle (when used), schema organization: https://orm.drizzle.team/docs/sql-schema-declaration
+- Drizzle (when used), Drizzle Kit schema config: https://orm.drizzle.team/docs/drizzle-config-file
+- Drizzle (when used), transactions/savepoints: https://orm.drizzle.team/docs/transactions
 - Better Auth database hooks: https://www.better-auth.com/docs/concepts/database

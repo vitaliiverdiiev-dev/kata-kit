@@ -33,25 +33,25 @@ src/
 
 - Assign each operation and persisted business fact one owning module. Keep modules cohesive and acyclic.
 - Use `http/`, `application/`, `domain/`, `persistence/`, `integrations/`, and `cli/` as **responsibility names, not mandatory folders**; add only those justified by actual code. A tiny module may have just its Nest module and a controller/provider.
-- Keep controllers/CLI thin; coordinate application operations outside transports; place pure business invariants in `domain` when a separate domain boundary earns its cost. Domain logic must not depend on Nest, Drizzle, HTTP, or a vendor SDK.
+- Keep controllers/CLI thin; coordinate application operations outside transports; place pure business invariants in `domain` when a separate domain boundary earns its cost. Domain logic must not depend on Nest, the ORM/query builder, HTTP, or a vendor SDK.
 - A feature's internals are private by default. Other modules import its Nest module and use explicitly exported providers/public contracts, not private controllers, helpers, or repositories. Use narrow public types and avoid re-exporting everything.
-- `index.ts` is optional for a consumer-facing source entrypoint; use direct file imports **inside** the module to avoid barrels and cycles.
+- When a module exposes providers, tokens or types to other modules, those public contracts must be importable through one explicitly designated public source entrypoint (`index.ts` or a dedicated public contract file); consumers import only from it. A module without external consumers needs no entrypoint. Inside the module, use direct file imports, never its own entrypoint, to avoid barrels and cycles.
 - Prefer direct provider calls for synchronous cross-module operations. Resolve cycles by reconsidering ownership/orchestration before using `forwardRef()`.
 
 Read [Module contracts](references/module-contracts.md) when creating modules, deciding layer placement, cross-module dependencies, ownership, or portable boundaries.
 
 ## Data ownership and cross-module reads
 
-- A module owns writes and invariants for its data. Shared PostgreSQL and one database infrastructure are compatible with independent ownership.
-- Keep Drizzle schema definitions with their owner when the project supports it. Let the project's Drizzle configuration discover schemas; keep **one reviewed migration history** for one database. Never rewrite applied migrations or automatically `push` schemas on production startup.
+- A module owns writes and invariants for its data. A shared database and one database infrastructure are compatible with independent ownership.
+- Keep schema/model definitions with their owner when the project's ORM and tooling support it, and let the project's schema configuration discover them. Keep **one reviewed migration history** for one database. Never rewrite applied migrations or automatically push/sync schemas on production startup.
 - Cross-module FKs are allowed when necessary for integrity; they do **not** authorize cross-module business writes. Coordinate shared schema references explicitly.
 - Read through public APIs by default. For multi-module views prefer batched read composition. Permit specialized **read-only** cross-module JOINs only when justified (e.g., filtering/sorting across all rows, aggregation, measured performance), isolated and DB-integration-tested. Never bypass authorization or business invariants through reporting queries.
 
-Read [Data ownership and transactions](references/data-and-transactions.md) for schema composition, read exceptions, transaction boundaries, concurrency, and Better Auth caveats.
+Read [Data ownership and transactions](references/data-and-transactions.md) for schema composition, read exceptions, transaction boundaries, concurrency, Drizzle specifics, and Better Auth caveats.
 
 ## Transaction policy
 
-- For one-module atomic work, use the project's native Drizzle transaction facility.
+- For one-module atomic work, use the project's native ORM/driver transaction facility.
 - For genuinely atomic multi-module writes, one explicit coordinator owns **one shared transaction context**; participating persistence operations must use that context, not independent transactions. Choose and test a small concrete typed contract **when a real use case requires it**; do not scaffold `TransactionRunner`, Unit of Work, ALS/CLS, or outbox in advance.
 - Do not assume third-party auth/database hooks participate in an application transaction. Verify actual adapter and lifecycle semantics for the installed versions.
 - Protect concurrency invariants with DB constraints, atomic statements/locking where needed, and isolated database tests. Avoid external network calls inside DB transactions.
@@ -62,6 +62,6 @@ Read [Data ownership and transactions](references/data-and-transactions.md) for 
 - Keep module-owned integration tests under `modules/<feature>/tests/integrations/` where the runner supports it, using the project's naming; application-spanning e2e and shared harnesses may live at project-level `test/` or `tests/`. Do **not** relocate existing tests solely to satisfy this convention; any deliberate move must update runner globs, scripts and CI and confirm discovery.
 - `testing` owns test selection/TDD; `code-quality` owns general TypeScript and comment rules; `quality-gate` owns final verification. Do not duplicate their procedures here.
 - For auth, respect the selected proven library; do not invent password/session crypto. Check the installed library/Nest/ORM versions against official docs before committing to an integration. Enforce permissions on the server, validate at trust boundaries, review cookie/CSRF/CORS/rate-limit policies, document the self-hosted bootstrap/registration policy, and never expose credentials, secrets or internal error stacks.
-- Verify with actual project commands and report pass/fail/blocked; do not modify database state, CI, Git history, or ship without explicit authorization.
+- Verify with actual project commands and report pass/fail/blocked. Authorized test suites may modify an explicitly configured, isolated nonproduction test database. Never modify production, staging, unknown or user-data databases, and never run destructive migrations, schema push or database resets outside that isolated test environment, without explicit authorization. Do not change CI, Git history, or ship without explicit authorization.
 
 Read [Tests and portability](references/tests-and-portability.md) when placing tests, moving reusable modules, or assessing extraction into another compatible application.
