@@ -34,6 +34,10 @@ Advisory engineering standards. Claude may load a skill's full text when the tas
 
 These are defaults. A project's own ESLint/TypeScript config stays the enforced check. Its `CLAUDE.md` holds project context, commands and documented exceptions; it should not redefine these standards. A conflict between the two should be raised and decided, not silently ignored.
 
+## Technical communication standard
+
+[`standards/technical-communication.md`](standards/technical-communication.md) is loaded automatically: plugin hooks add it to the context at every session start (`SessionStart`) and every subagent start (`SubagentStart`). It sets how Claude writes plans, reviews, handoffs and reports, and how it labels evidence (verified, reported, not run). It is an instruction, not a validator, and applies only where KataKit is enabled.
+
 ## Update
 
 ```
