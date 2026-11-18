@@ -33,7 +33,7 @@ A capability never gets its own Nest module, `index.ts` or barrel. Its providers
 
 | Responsibility | Owns | Must avoid |
 | --- | --- | --- |
-| `http/` | Nest controllers, request/response DTOs, guards, pipes, transport-level response mapping | SQL, vendor SDK calls, meaningful business decisions |
+| `http/` | Nest controllers, request/response DTOs, guards, pipes, transport-level response mapping | SQL, runtime calls into vendor SDKs or integration internals, meaningful business decisions |
 | `application/` | Use cases, workflows, orchestration, permission checks at the proper boundary, transaction boundaries | HTTP specifics, SQL/query-builder code, vendor SDK details, supporting type/constant/helper collections |
 | `model/` | Business contracts, validation schemas, constants, policies and pure logic, business mappers | Nest, HTTP, ORM/query builder, vendor SDK imports; I/O of any kind |
 | `persistence/` | Database schema/table definitions, queries and data-access providers, row↔model mapping | HTTP contracts, business workflows, vendor SDK calls |
@@ -65,12 +65,13 @@ There is no compulsory `service.ts`, action class, repository interface, domain 
 
 ## Other responsibilities: files and naming
 
-Responsibility directories are flat except `tests/`, the role directories of `http/`, and one `integrations/<system>/` folder per external system. No other subdirectories (`application/types/`, `persistence/queries/`) unless the project documents the exception.
+Responsibility directories are flat except `tests/`, the role directories of `http/`, and one `integrations/<vendor>/` folder per external system (with its own role directories when needed). No other subdirectories (`application/types/`, `persistence/queries/`) unless the project documents the exception.
 
-- `http/`: role directories created only when used — `controllers/<capability>.controller.ts`, `dtos/<action>-<concept>.dto.ts`, `guards/<name>.guard.ts`, `pipes/<name>.pipe.ts`; other Nest roles (`decorators/`, `filters/`, `interceptors/`) follow the same pattern.
+- `http/`: role directories created only when used — `controllers/<capability>.controller.ts`, `dto/<action>-<concept>.dto.ts`, `guards/<name>.guard.ts`, `pipes/<name>.pipe.ts`; other Nest roles (`decorators/`, `filters/`, `interceptors/`) follow the same pattern.
 - `application/`: one file per use case named `<verb>-<concept>.ts` (`accept-invitation.ts`); `<name>.workflow.ts` for multi-step orchestration; `<capability>.service.ts` only when a single Nest provider grouping a few small operations reads better than separate files. Supporting types, schemas, constants and pure helpers go to `model/`.
 - `persistence/`: `<concept>.table.ts` for database schema/table definitions, `<concept>.queries.ts` for queries, `<concept>.mapper.ts` for row mapping, `<concept>.repository.ts` only for an injectable data-access provider. Application calls these; it never builds SQL.
-- `integrations/<system>/`: `<system>.config.ts`, `<system>.adapter.ts`, `<system>.plugin.ts`, `<system>.hooks.ts`, `<system>.types.ts` as needed. `<system>` names the external system or library, not the product.
+- `integrations/<vendor>/`: `<vendor>` names the external system or library, not the product. A small integration may hold flat files (`<vendor>.config.ts`, `<vendor>.adapter.ts`, `<vendor>.types.ts`); once a role has several files, use predictable role directories — `config/`, `plugins/`, `hooks/`, `adapters/`, `types/` — created only when used.
+- **Integration ownership:** an integration serving several capabilities lives once at module level, with its configuration, plugins, callbacks and vendor types together under `integrations/<vendor>/`; do not scatter one provider's setup and plugins across capabilities. A capability-level `integrations/<vendor>/` is only for an integration used by that capability alone.
 - `cli/` (module root): `<module>.cli.ts` for routing/dispatch when there are several commands, `<name>.command.ts` per command, `<name>.handler.ts` when handling is substantial, `<name>.prompts.ts` for terminal interaction. Commands call capability `application/`.
 
 ### Naming collisions
@@ -85,18 +86,19 @@ Default allowed imports (anything not listed is disallowed unless documented):
 
 | From | May import |
 | --- | --- |
-| `http/` | own capability `application/`, module `model/` |
+| `http/` | own capability `application/`, module `model/`, transport-specific decorators/guards from Nest or a vendor's transport package, **type-only** imports of vendor/integration contracts |
 | `cli/` (module root) | any capability's `application/`, module `model/` |
 | `application/` | module `model/`, own capability `persistence/` and `integrations/`, module-level shared `persistence/`/`integrations/`, another capability's `application/`, other modules' public entrypoints |
 | `persistence/` | module `model/`, shared DB infrastructure; another owner's **table definition** only for FK/relation declarations (see table ownership) |
 | `integrations/` (outbound adapters) | module `model/`, shared infrastructure, vendor SDKs |
-| `integrations/` (inbound callbacks/hooks) | additionally the capability `application/` they drive, like a transport, provided no import cycle results |
+| `integrations/` (inbound callbacks/hooks, module- or capability-level) | additionally the capability `application/` they drive, like a transport, provided no import cycle results |
 | `model/` | other `model/` files of the same module, framework-neutral libraries only |
 | `tests/` | the code they verify and shared test harnesses |
 
 - **Across capabilities:** only through the other capability's `application/`; never its `http/`, `persistence/` or `integrations/`. Keep capability dependencies acyclic; if two capabilities need each other, the shared part belongs in `model/`, a shared module-level directory, or an orchestrating use case in one of them.
 - **Table ownership:** every table belongs to exactly one owner — a capability's `persistence/`, or module-level `persistence/` only for data owned by the module as a whole. Another capability's (or module's) table definition may import it **solely** to declare an FK or ORM relation. That narrow schema reference does not permit queries, writes or row-type reuse through it; data still flows through the owner's `application/` or public API. Do not move a table to module level just because others reference it.
-- **Module-level shared directories** (`integrations/`, `persistence/`) must not import capability internals; module-level `cli/` is an entry point and may call capability `application/`.
+- **Module-level shared directories** must not import capability internals, except entry points: module-level `cli/` and inbound callbacks in module-level `integrations/<vendor>/` may call capability `application/`. Module-level `persistence/` never imports capabilities.
+- **HTTP and integrations:** business operations from `http/` go through `application/`. A type-only import (`import type`) of a vendor or integration contract, or a required transport decorator/guard, is allowed; it is not permission to call integration internals at runtime. Do not create an application file solely to re-export a type HTTP needs.
 - **Vendor callbacks and cycles:** an inbound callback may import the `application/` it drives; application may import outbound adapters. Neither may close a loop: application never imports the callback, nor a vendor setup file that imports the callback. When the vendor setup needs the callback and application needs the configured vendor, connect them at a composition root instead of by import — `<module>.module.ts` (DI registration, a provider factory when DI is the natural fit) or the project's established setup function that receives callbacks as arguments. Plain imports remain the default whenever they are acyclic; no factory is required per integration. Composition roots are explicit: `app/app.module.ts` for the app, `<module>.module.ts` for each module.
 - **Across modules:** consumer → owner's **public entrypoint** and exported providers only. Export the provider from the owner Nest module and import that module; don't re-register another module's provider locally. A narrowly exported model type is fine when it is part of the designed public contract.
 - `app` → modules + infrastructure for composition only; `infrastructure` → framework/external technical facilities, **never** feature implementations (not even to aggregate schemas).
@@ -115,14 +117,15 @@ modules/auth/
 │   ├── schemas/     invitation.schema.ts
 │   ├── constants/   invitation.constants.ts
 │   └── helpers/     invitation.policy.ts
-├── integrations/<auth-library>/   # shared vendor setup used by several capabilities
-│   └── <auth-library>.config.ts
+├── integrations/<auth-library>/   # one shared provider, kept together
+│   ├── config/      <auth-library>.config.ts
+│   ├── plugins/     <plugin-name>.plugin.ts
+│   └── hooks/       invitation.hooks.ts      # inbound callback → invitations/application
 ├── cli/             auth.cli.ts, create-owner.command.ts   # module-wide CLI
 ├── invitations/
-│   ├── http/        controllers/invitations.controller.ts, dtos/create-invitation.dto.ts
+│   ├── http/        controllers/invitations.controller.ts, dto/create-invitation.dto.ts
 │   ├── application/ create-invitation.ts, accept-invitation.ts
 │   ├── persistence/ invitation.table.ts, invitation.queries.ts
-│   ├── integrations/<auth-library>/<auth-library>.hooks.ts   # inbound callback → application
 │   └── tests/integrations/accept-invitation.spec.ts
 ├── sessions/
 │   ├── http/        controllers/sessions.controller.ts, guards/session.guard.ts
@@ -132,7 +135,7 @@ modules/auth/
 └── tests/integrations/auth.spec.ts   # module-wide flow
 ```
 
-Vendor types stay in `integrations/`; `model/types/session.types.ts` holds the product's session contract that other modules see through `index.ts`. Library-owned tables are not duplicated in `persistence/`. `cli/create-owner.command.ts` calls `bootstrap/application/create-owner.ts`. The invitations hook imports `invitations/application/`; because application code also uses the configured library, the shared config receives the hook at the composition root (`auth.module.ts` or the config's setup function) instead of importing it, so no cycle forms.
+Vendor types stay in `integrations/`; `model/types/session.types.ts` holds the product's session contract that other modules see through `index.ts`. Library-owned tables are not duplicated in `persistence/`. `cli/create-owner.command.ts` calls `bootstrap/application/create-owner.ts`. `hooks/invitation.hooks.ts` imports `invitations/application/`. If application code also imports the configured library, the config must not import the hook; it receives it at the composition root (`auth.module.ts` or the config's setup function), so no cycle forms. If no application code imports the config, a plain import from config to hook is fine. Session controllers may use the library's transport decorators and `import type` its session contract, but session lookups go through `sessions/application/`.
 
 **Vocabulary — several functional capabilities.**
 
@@ -157,7 +160,7 @@ modules/vocabulary/
 modules/preferences/
 ├── preferences.module.ts
 ├── index.ts                 # only if another module consumes preferences
-├── http/          controllers/preferences.controller.ts, dtos/update-preferences.dto.ts
+├── http/          controllers/preferences.controller.ts, dto/update-preferences.dto.ts
 ├── application/   get-preferences.ts, update-preferences.ts
 ├── model/
 │   ├── types/     preferences.types.ts
