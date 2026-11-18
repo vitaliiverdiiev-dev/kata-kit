@@ -20,7 +20,7 @@ Advisory engineering standards. Claude may load a skill's full text when the tas
 | Skill | Covers | Loads automatically for |
 |---|---|---|
 | `/kata-kit:frontend-architecture` | `app/pages/domain/shared` layers, slices (`api/model/helpers/store/hooks/ui`), component boundaries, imports, test placement | React + TypeScript frontend changes |
-| `/kata-kit:backend-architecture` | `app/infrastructure/modules` modular monolith, feature ownership, module public API, data ownership and cross-module reads, transactions, test placement, portability, auth safety (details in `references/`) | NestJS backends only, not FastAPI, Hono etc. |
+| `/kata-kit:backend-architecture` | `app/infrastructure/modules` modular monolith, Module → Capability → Responsibility (`http/application/model/persistence/integrations/cli`), module-level `model/`, dependency directions, module public API, data ownership and cross-module reads, transactions, test placement, portability, auth safety (details in `references/`) | NestJS backends only, not FastAPI, Hono etc. |
 | `/kata-kit:code-quality` | minimal complete diffs, canonical comment policy, strict TypeScript (sole owner, details in `references/typescript.md`), import/export ordering, `id`-first keys, JSX props, safe autofix | Implementing or reviewing TypeScript / React / NestJS code |
 | `/kata-kit:testing` | what is worth testing, TDD (red → green → refactor), regression tests, test doubles, coverage as a diagnostic | Building or changing behavior, fixing bugs |
 | `/kata-kit:quality-gate` | final evidence-based verification: types, lint, format, tests, build, runtime, security; PASS / FAIL / NOT RUN / BLOCKED and a READY / NOT READY decision | Explicit checkpoints: before a commit or PR, release, or "done" |
