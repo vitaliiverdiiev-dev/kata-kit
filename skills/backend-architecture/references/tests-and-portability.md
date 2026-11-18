@@ -24,7 +24,7 @@ Integration tests belong to the **boundary of the behavior they verify**: put th
 
 | Verified behavior | Location |
 | --- | --- |
-| One persistence operation against a real DB (constraint, query, locking) | `<capability>/persistence/tests/integrations/` |
+| Persistence operations against a real DB (constraint, query, locking) | `<capability>/persistence/tests/integrations/` (or module-level `persistence/tests/integrations/`) |
 | A capability's behavior through its real providers, DB or vendor hooks | `<capability>/tests/integrations/` |
 | A flow across several capabilities, or the module's public contract | `modules/<module>/tests/integrations/` |
 | A single-capability module | `modules/<module>/tests/integrations/` (module root is the capability) |
@@ -51,7 +51,8 @@ modules/auth/
 │   │   └── tests/
 │   │       └── accept-invitation.spec.ts
 │   ├── persistence/
-│   │   ├── invitation.queries.ts
+│   │   ├── queries/
+│   │   │   └── invitation.queries.ts
 │   │   └── tests/
 │   │       └── integrations/
 │   │           └── invitation.queries.spec.ts

@@ -36,7 +36,7 @@ A capability never gets its own Nest module, `index.ts` or barrel. Its providers
 | `http/` | Nest controllers, request/response DTOs, guards, pipes, transport-level response mapping | SQL, runtime calls into vendor SDKs or integration internals, meaningful business decisions |
 | `application/` | Use cases, workflows, orchestration, permission checks at the proper boundary, transaction boundaries | HTTP specifics, SQL/query-builder code, vendor SDK details, supporting type/constant/helper collections |
 | `model/` | Business contracts, validation schemas, constants, policies and pure logic, business mappers | Nest, HTTP, ORM/query builder, vendor SDK imports; I/O of any kind |
-| `persistence/` | Database schema/table definitions, queries and data-access providers, row↔model mapping | HTTP contracts, business workflows, vendor SDK calls |
+| `persistence/` | Database schema/table definitions, queries and data-access operations, persistence ↔ business-contract mapping, justified repositories | HTTP contracts, business workflows, vendor SDK calls |
 | `integrations/` | External SDKs, auth/library plugins, adapters, vendor callbacks and vendor-specific config/types | Product policy, raw SQL for module data, duplicated framework behavior |
 | `cli/` | Module-wide command routing/dispatching, commands, handlers, terminal prompts/output; lives at the module root even in multi-capability modules | Duplicated use-case logic, direct persistence access |
 | `tests/` | Unit tests that don't sit adjacent; `tests/integrations/` for the boundary of that directory | Shared harnesses for the whole app (project-level `test/`) |
@@ -61,23 +61,33 @@ There is no compulsory `service.ts`, action class, repository interface, domain 
 - A framework-neutral validation library already used by the project is allowed in `model/`; Nest decorators, ORM table objects and vendor types are not.
 - Distinguish contracts by boundary: HTTP DTOs live in `http/` and may be derived from or validated by a model schema; database schemas and inferred row types live in `persistence/`; vendor types live in `integrations/` and are mapped at that boundary. Reuse one shape where the boundaries genuinely coincide rather than copying it.
 - Backend `model/` groups helpers and mappers as categories; this intentionally differs from frontend slices, where `helpers/` is a sibling segment.
-- Persistence-specific mapping (row ↔ business contract) belongs in `persistence/`; transport mapping belongs in `http/`. `model/mappers/` is only for conversions that are business logic.
+- Persistence-specific mapping (row ↔ business contract) belongs in `persistence/mappers/`; transport mapping belongs in `http/`. `model/mappers/` is only for conversions that are business logic.
 
 ## Other responsibilities: files and naming
 
-Responsibility directories are flat except `tests/`, the role directories of `http/`, and one `integrations/<vendor>/` folder per external system (with its own role directories when needed). No other subdirectories (`application/types/`, `persistence/queries/`) unless the project documents the exception.
+Each responsibility has a fixed internal structure. Create a category directory only when it has files; never create empty ones. Inside a category, files are flat.
 
-- `http/`: role directories created only when used — `controllers/<capability>.controller.ts`, `dto/<action>-<concept>.dto.ts`, `guards/<name>.guard.ts`, `pipes/<name>.pipe.ts`; other Nest roles (`decorators/`, `filters/`, `interceptors/`) follow the same pattern.
+| Responsibility | Internal structure |
+| --- | --- |
+| `model/` | Categories only: `types/`, `schemas/`, `constants/`, `helpers/`, `mappers/` (see Model) |
+| `http/` | Categories only: `controllers/`, `dto/`, `guards/`, `pipes/`; other Nest roles as `decorators/`, `filters/`, `interceptors/` |
+| `persistence/` | Production code uses only `schemas/`, `queries/`, `mappers/` and `repositories/` — the same at module and capability level. Tests may use `persistence/tests/` according to the testing convention |
+| `integrations/` | One `<vendor>/` per external system; inside it, flat files for a small integration or the categories `config/`, `plugins/`, `hooks/`, `adapters/`, `types/` |
+| `application/`, `cli/` | Flat files |
+
+`tests/` may appear in any directory, following the test placement rules. No other nesting — not `application/types/`, `persistence/queries/invitations/` or `http/controllers/admin/` — unless the project documents the exception.
+
+- `http/`: `controllers/<capability>.controller.ts`, `dto/<action>-<concept>.dto.ts`, `guards/<name>.guard.ts`, `pipes/<name>.pipe.ts`; other Nest roles (`decorators/`, `filters/`, `interceptors/`) follow the same pattern.
 - `application/`: one file per use case named `<verb>-<concept>.ts` (`accept-invitation.ts`); `<name>.workflow.ts` for multi-step orchestration; `<capability>.service.ts` only when a single Nest provider grouping a few small operations reads better than separate files. Supporting types, schemas, constants and pure helpers go to `model/`.
-- `persistence/`: `<concept>.table.ts` for database schema/table definitions, `<concept>.queries.ts` for queries, `<concept>.mapper.ts` for row mapping, `<concept>.repository.ts` only for an injectable data-access provider. Application calls these; it never builds SQL.
-- `integrations/<vendor>/`: `<vendor>` names the external system or library, not the product. A small integration may hold flat files (`<vendor>.config.ts`, `<vendor>.adapter.ts`, `<vendor>.types.ts`); once a role has several files, use predictable role directories — `config/`, `plugins/`, `hooks/`, `adapters/`, `types/` — created only when used.
+- `persistence/`: `schemas/<concept>.table.ts` for database table/schema definitions (suffix per the project's ORM, see naming collisions), `queries/<concept>.queries.ts` for queries and data-access operations, `mappers/<concept>-row.mapper.ts` for persistence ↔ business-contract mapping, `repositories/<concept>.repository.ts` only when a real repository implementation or injectable provider is justified (no repository interface). Application calls these; it never builds SQL.
+- `integrations/<vendor>/`: `<vendor>` names the external system or library, not the product. A small integration may hold flat files (`<vendor>.config.ts`, `<vendor>.adapter.ts`, `<vendor>.types.ts`); once a role has several files, use the categories `config/`, `plugins/`, `hooks/`, `adapters/`, `types/`.
 - **Integration ownership:** an integration serving several capabilities lives once at module level, with its configuration, plugins, callbacks and vendor types together under `integrations/<vendor>/`; do not scatter one provider's setup and plugins across capabilities. A capability-level `integrations/<vendor>/` is only for an integration used by that capability alone.
 - `cli/` (module root): `<module>.cli.ts` for routing/dispatch when there are several commands, `<name>.command.ts` per command, `<name>.handler.ts` when handling is substantial, `<name>.prompts.ts` for terminal interaction. Commands call capability `application/`.
 
 ### Naming collisions
 
-- Never reuse one filename for unrelated responsibilities inside a module (two `invitation.ts`, or `model/schemas/x.schema.ts` and `persistence/x.schema.ts`). The suffix states the responsibility.
-- Validation schemas and database schemas must have distinct suffixes, and the ORM's schema discovery must not match validation files. Defaults: `*.schema.ts` for validation, `*.table.ts` for database definitions. A project whose tooling already uses `*.schema.ts` for database schemas may keep it and use another validation suffix (e.g. `*.validation.ts`); record the choice in project docs and apply it everywhere.
+- Never reuse one filename for unrelated responsibilities inside a module (two `invitation.ts`, `model/schemas/x.schema.ts` and `persistence/schemas/x.schema.ts`, or `model/mappers/x.mapper.ts` and `persistence/mappers/x.mapper.ts`). The suffix states the responsibility; persistence mappers use `-row.mapper.ts`.
+- Validation schemas and database schemas must have distinct suffixes, and the ORM's schema discovery must not match validation files. Defaults: `*.schema.ts` for validation, `*.table.ts` for database definitions. A project whose ORM tooling already uses `*.schema.ts` for database schemas keeps its existing files (no rename is required) and uses another validation suffix (e.g. `*.validation.ts`); record the choice in project docs and apply it everywhere.
 - Main implementation should be obvious from the filename. Do not split every small function into its own file; split when a file mixes responsibilities, not when it reaches a length.
 
 ## Dependency directions
@@ -125,7 +135,7 @@ modules/auth/
 ├── invitations/
 │   ├── http/        controllers/invitations.controller.ts, dto/create-invitation.dto.ts
 │   ├── application/ create-invitation.ts, accept-invitation.ts
-│   ├── persistence/ invitation.table.ts, invitation.queries.ts
+│   ├── persistence/ schemas/invitation.table.ts, queries/invitation.queries.ts, mappers/invitation-row.mapper.ts
 │   └── tests/integrations/accept-invitation.spec.ts
 ├── sessions/
 │   ├── http/        controllers/sessions.controller.ts, guards/session.guard.ts
@@ -147,12 +157,12 @@ modules/vocabulary/
 │   ├── types/     word.types.ts, deck.types.ts, review.types.ts
 │   ├── schemas/   word.schema.ts
 │   └── helpers/   review-schedule.ts          # pure spacing algorithm
-├── words/   { http/, application/, persistence/ word.table.ts, word.queries.ts }
-├── decks/   { http/, application/, persistence/ deck.table.ts, deck-word.table.ts }
-└── reviews/ { http/, application/ submit-review.ts, persistence/ review.queries.ts }
+├── words/   { http/, application/, persistence/ schemas/word.table.ts, queries/word.queries.ts }
+├── decks/   { http/, application/, persistence/ schemas/deck.table.ts, schemas/deck-word.table.ts, queries/deck.queries.ts }
+└── reviews/ { http/, application/ submit-review.ts, persistence/ schemas/review.table.ts, queries/review.queries.ts }
 ```
 
-`reviews/application/submit-review.ts` uses `model/helpers/review-schedule.ts` and calls `words/application/` to load words; it does not import `words/persistence/`. `words/` owns `word.table.ts`. `decks/persistence/deck-word.table.ts` imports it only to declare the FK/relation; decks never query or write words through it and use `words/application/` for word data.
+`reviews/application/submit-review.ts` uses `model/helpers/review-schedule.ts` and calls `words/application/` to load words; it does not import `words/persistence/`. `words/` owns `persistence/schemas/word.table.ts`. `decks/persistence/schemas/deck-word.table.ts` imports it only to declare the FK/relation; decks never query or write words through it and use `words/application/` for word data.
 
 **Preferences — single capability.**
 
@@ -166,7 +176,7 @@ modules/preferences/
 │   ├── types/     preferences.types.ts
 │   ├── schemas/   preferences.schema.ts
 │   └── constants/ preferences.constants.ts
-└── persistence/   preferences.table.ts, preferences.queries.ts
+└── persistence/   schemas/preferences.table.ts, queries/preferences.queries.ts
 ```
 
 No capability directory, no `mappers/`, no `integrations/`: none has code.

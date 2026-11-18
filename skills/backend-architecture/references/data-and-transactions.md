@@ -4,10 +4,10 @@ Use for schema changes, inter-module data access, multi-step writes, concurrency
 
 ## Data ownership
 
-- A functional module owns its business invariants, writes and the schema definitions of its data. Within a module, a table belongs to one capability's `persistence/`, or to module-level `persistence/` only when the module as a whole owns it; being referenced by other capabilities does not change its owner. Different modules may share one database and one connection/pool.
+- A functional module owns its business invariants, writes and the schema definitions of its data. Within a module, a table definition belongs to one capability's `persistence/schemas/`, or to module-level `persistence/schemas/` only when the module as a whole owns it; being referenced by other capabilities does not change its owner. Different modules may share one database and one connection/pool.
 - Owning a capability is not the same as owning duplicate rows: e.g., a Users module can expose profile-facing operations while the auth library remains the source of truth for its identity fields.
 - Foreign keys between owner tables are allowed where DB integrity warrants them. A foreign key does not grant permission for consumer business writes.
-- Keep schema definitions with their owner when compatible with existing tooling. Discover them via the ORM's supported multi-file configuration (**Drizzle:** Drizzle Kit globs/paths) or **composition in an app-level root**, rather than making shared `infrastructure/` import feature internals. Discovery patterns must match database definitions in `persistence/` only, never `model/schemas/` validation files; the file suffix is a project decision (see module contracts, naming collisions). A narrow schema-to-schema import for a real FK or ORM relation is an intentional compile-time exception, across modules or capabilities, not a runtime permission to query or write the owner's data.
+- Keep schema definitions with their owner when compatible with existing tooling. Discover them via the ORM's supported multi-file configuration (**Drizzle:** Drizzle Kit globs/paths) or **composition in an app-level root**, rather than making shared `infrastructure/` import feature internals. Discovery patterns must match database definitions in `persistence/schemas/` only, never `model/schemas/` validation files; the file suffix is a project decision (see module contracts, naming collisions). A narrow schema-to-schema import for a real FK or ORM relation is an intentional compile-time exception, across modules or capabilities, not a runtime permission to query or write the owner's data.
 - Prefer one reviewed, ordered migration history for one application database, even when schema definitions are module-local. Treat a new starter project as a fresh migration baseline only when appropriate; never rewrite already-applied history in a running installation.
 - Existing migrations, schema globs, ORM relation declarations, auth-library adapter schemas and runtime query requirements must be checked before any move. ORM-level relations (**Drizzle:** `relations()`) are not a substitute for actual DB FK constraints.
 
@@ -23,7 +23,7 @@ Read-model exception does not permit cross-module writes, reliance on private re
 
 ### One module
 
-Use the existing ORM's native transaction API (**Drizzle:** `db.transaction(...)`) for a real multi-write atomic invariant. The use case in `application/` decides the boundary; each query lives in `persistence/` and accepts the transaction context as a parameter, so SQL never moves into orchestration code. Keep transaction lifetime short. Honor the selected driver and its TypeScript types.
+Use the existing ORM's native transaction API (**Drizzle:** `db.transaction(...)`) for a real multi-write atomic invariant. The use case in `application/` decides the boundary; each query lives in `persistence/queries/` and accepts the transaction context as a parameter, so SQL never moves into orchestration code. Keep transaction lifetime short. Honor the selected driver and its TypeScript types.
 
 ### Multiple modules (only if **all** writes must be atomic)
 
